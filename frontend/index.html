@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediChart — Smart Healthcare Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-gradient: linear-gradient(135deg, #0F2027 0%, #203A43 50%, #2C5364 100%);
+    --card-bg: rgba(255, 255, 255, 0.95);
+    --ink: #0F172A;
+    --muted: #64748B;
+    --primary: #0F6E5F;
+    --primary-hover: #0A5247;
+    --border: #E2E8F0;
+    --danger: #EF4444;
+    --shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--bg-gradient);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    border-radius: 16px;
+    padding: 44px 36px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    animation: fadeIn 0.5s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .brand-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .brand-logo {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, #0F6E5F 0%, #14B8A6 100%);
+    border-radius: 12px;
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    box-shadow: 0 4px 12px rgba(15, 110, 95, 0.3);
+  }
+  .brand-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--ink);
+  }
+  .sub-title {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 32px;
+    line-height: 1.5;
+  }
+  .field { margin-bottom: 20px; }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 8px;
+  }
+  input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 9px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--ink);
+    background: #F8FAFC;
+    transition: all 0.2s ease;
+  }
+  input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: #FFFFFF;
+    box-shadow: 0 0 0 3px rgba(15, 110, 95, 0.15);
+  }
+  button {
+    width: 100%;
+    padding: 13px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: 'Outfit', sans-serif;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 0.2s ease, transform 0.1s ease;
+    box-shadow: 0 4px 12px rgba(15, 110, 95, 0.25);
+  }
+  button:hover { background: var(--primary-hover); transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+  #errorMsg {
+    color: var(--danger);
+    font-size: 13px;
+    margin-top: 16px;
+    min-height: 18px;
+    text-align: center;
+    font-weight: 500;
+  }
+  .footer-tag {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="brand-header">
+      <div class="brand-logo">MC</div>
+      <h1 class="brand-title">MediChart</h1>
+    </div>
+    <p class="sub-title">Smart Healthcare Monitoring & Early Risk Detection System</p>
+
+    <div class="field">
+      <label for="email">Email address</label>
+      <input type="email" id="email" placeholder="doctor1@ehr.com" value="doctor1@ehr.com">
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="••••••••">
+    </div>
+    <button onclick="login()" id="loginBtn">Sign In to Dashboard</button>
+    <p id="errorMsg"></p>
+
+    <div class="footer-tag">AWS Cloud & IoT Powered Healthcare Portal</div>
+  </div>
+
+  <script>
+    const CLIENT_ID = "5ok9ten25r2dgh9u5q2omuihml";
+    const REGION = "ap-south-1";
+
+    async function login() {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const errorMsg = document.getElementById("errorMsg");
+      const btn = document.getElementById("loginBtn");
+      errorMsg.textContent = "";
+
+      if (!email || !password) {
+        errorMsg.textContent = "Please enter both email and password";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Authenticating with Cognito...";
+
+      try {
+        const res = await fetch(`https://cognito-idp.${REGION}.amazonaws.com/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-amz-json-1.1",
+            "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth"
+          },
+          body: JSON.stringify({
+            AuthFlow: "USER_PASSWORD_AUTH",
+            ClientId: CLIENT_ID,
+            AuthParameters: { USERNAME: email, PASSWORD: password }
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.AuthenticationResult) {
+          sessionStorage.setItem("idToken", data.AuthenticationResult.IdToken);
+          if (data.AuthenticationResult.RefreshToken) {
+            sessionStorage.setItem("refreshToken", data.AuthenticationResult.RefreshToken);
+          }
+          window.location.href = "dashboard.html";
+        } else {
+          errorMsg.textContent = data.message || data.Message || "Authentication failed. Check credentials.";
+        }
+      } catch (err) {
+        errorMsg.textContent = "Network error: " + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Sign In to Dashboard";
+      }
+    }
+
+    document.getElementById("password").addEventListener("keydown", e => {
+      if (e.key === "Enter") login();
+    });
+  </script>
+</body>
+</html>

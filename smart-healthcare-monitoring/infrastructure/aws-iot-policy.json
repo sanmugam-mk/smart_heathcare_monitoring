@@ -1,0 +1,15 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "iot:Connect",
+      "Resource": "arn:aws:iot:ap-south-1:ACCOUNT_ID:client/ESP32_SIMULATOR"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iot:Publish",
+      "Resource": "arn:aws:iot:ap-south-1:ACCOUNT_ID:topic/smart-healthcare/P001/vitals"
+    }
+  ]
+}

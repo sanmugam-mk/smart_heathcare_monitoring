@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f6e5f">
+  <title>Monitoring Dashboard | MediChart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+  <script type="module" src="js/dashboard.js"></script>
+</head>
+<body>
+  <header class="navbar">
+    <a class="brand" href="dashboard.html" aria-label="MediChart dashboard">
+      <span class="brand-mark">M</span><span class="brand-name">MediChart Monitoring System</span>
+    </a>
+    <div class="nav-right">
+      <span id="doctor-role" class="role-badge">Doctor</span>
+      <a class="button button-quiet" href="documents.html">Documents</a>
+      <button id="sign-out" class="button button-outline">Sign Out</button>
+    </div>
+  </header>
+
+  <main class="dashboard-grid">
+    <aside class="panel-card directory">
+      <div class="section-heading">
+        <h2>Patient Directory</h2>
+        <button id="refresh-patients" class="icon-button" aria-label="Refresh patients" title="Refresh">↻</button>
+      </div>
+      <label class="sr-only" for="patient-search">Search patients</label>
+      <input id="patient-search" class="text-input" type="search" placeholder="Search patients">
+      <div id="patient-list" class="patient-list" aria-live="polite">
+        <p class="muted">Loading patients from AWS…</p>
+      </div>
+      <div class="form-divider"></div>
+      <h3>Register New Patient</h3>
+      <form id="patient-form" class="stack-form">
+        <label>Patient ID<input name="PatientId" required maxlength="64" pattern="[A-Za-z0-9_-]+" value="P001"></label>
+        <label>Full Name<input name="FullName" required maxlength="120"></label>
+        <div class="form-row">
+          <label>Age<input name="Age" required type="number" min="0" max="125"></label>
+          <label>Gender
+            <select name="Gender" required>
+              <option value="">Select</option><option>Female</option><option>Male</option><option>Other</option><option>Prefer not to say</option>
+            </select>
+          </label>
+        </div>
+        <button class="button button-primary" type="submit">Register Patient</button>
+      </form>
+      <p id="patient-feedback" class="inline-feedback" role="status"></p>
+    </aside>
+
+    <section class="monitoring">
+      <div class="panel-card patient-summary">
+        <div>
+          <p class="eyebrow">PATIENT MONITORING</p>
+          <h1 id="patient-name">Select a patient</h1>
+          <p id="patient-demographics" class="muted">Patient information is loaded from the authenticated AWS API.</p>
+        </div>
+        <div class="risk-summary">
+          <span id="risk-score" class="risk-score">—<small>/10</small></span>
+          <span id="risk-category" class="risk-pill risk-unknown">Waiting for data</span>
+          <span id="device-status" class="device-status"><span class="status-dot"></span>No recent device data</span>
+        </div>
+      </div>
+
+      <div class="simulated-banner">SIMULATED DATA – DEMONSTRATION ONLY. Not for clinical decisions.</div>
+      <div id="dashboard-error" class="notice notice-error" role="alert" hidden></div>
+      <div id="waiting-message" class="waiting-card">Waiting for incoming readings...</div>
+
+      <div class="vital-grid">
+        <article class="vital-card">
+          <div class="vital-title"><span class="vital-icon heart">♥</span><span>HEART RATE</span></div>
+          <p class="vital-value"><span id="heart-rate">—</span><small>BPM</small></p>
+          <p class="vital-foot">Latest received reading</p>
+        </article>
+        <article class="vital-card">
+          <div class="vital-title"><span class="vital-icon oxygen">O₂</span><span>OXYGEN SATURATION</span></div>
+          <p class="vital-value"><span id="spo2">—</span><small>%</small></p>
+          <p class="vital-foot">Latest received reading</p>
+        </article>
+        <article class="vital-card">
+          <div class="vital-title"><span class="vital-icon temperature">°</span><span>BODY TEMPERATURE</span></div>
+          <p class="vital-value"><span id="temperature">—</span><small>°C</small></p>
+          <p class="vital-foot">Latest received reading</p>
+        </article>
+      </div>
+
+      <div class="content-grid">
+        <article class="panel-card clinical-card">
+          <div class="section-heading"><h2>Clinical Decision Support</h2><span class="tag">Illustrative</span></div>
+          <p class="muted">Risk is calculated from received vital values; simulation mode is not used as a risk input.</p>
+          <ul id="risk-reasons" class="reason-list"><li>Waiting for an AWS-stored reading.</li></ul>
+          <p class="last-updated">Latest reading: <time id="last-updated">—</time></p>
+          <p class="disclaimer">Rule-based demonstration only. Not medically validated and not a substitute for professional care.</p>
+        </article>
+        <article class="panel-card alerts-card">
+          <div class="section-heading"><h2>Recent Alerts</h2><button id="refresh-alerts" class="text-button">Refresh</button></div>
+          <ul id="alert-list" class="alert-list"><li class="muted">No alert data loaded.</li></ul>
+        </article>
+      </div>
+
+      <section class="panel-card trends">
+        <div class="section-heading"><div><h2>Real-Time Vital Trends</h2><p class="muted">Charts use readings returned by AWS; no browser-generated readings.</p></div>
+          <span id="chart-updated" class="last-updated"></span></div>
+        <div class="chart-grid">
+          <article class="chart-card"><h3>Heart Rate</h3><canvas id="heart-chart" aria-label="Heart rate history"></canvas></article>
+          <article class="chart-card"><h3>SpO₂</h3><canvas id="spo2-chart" aria-label="oxygen saturation history"></canvas></article>
+          <article class="chart-card"><h3>Temperature</h3><canvas id="temperature-chart" aria-label="temperature history"></canvas></article>
+          <article class="chart-card"><h3>Risk Score</h3><canvas id="risk-chart" aria-label="risk score history"></canvas></article>
+        </div>
+      </section>
+    </section>
+  </main>
+  <footer class="page-footer">MediChart · Secure AWS-backed demonstration · SIMULATED VITAL DATA</footer>
+</body>
+</html>

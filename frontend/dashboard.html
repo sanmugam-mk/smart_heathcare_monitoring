@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediChart — Smart Healthcare Monitoring Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Chart.js for Vital & Risk Trend Visualization -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  :root {
+    --bg: #F1F5F9;
+    --surface: #FFFFFF;
+    --ink: #0F172A;
+    --muted: #64748B;
+    --primary: #0F6E5F;
+    --primary-dark: #0A5247;
+    --border: #E2E8F0;
+    --danger: #EF4444;
+    --danger-bg: #FEF2F2;
+    --warning: #F59E0B;
+    --warning-bg: #FFFBEB;
+    --success: #10B981;
+    --success-bg: #ECFDF5;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  /* Navigation Bar */
+  .navbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #0F6E5F 0%, #14B8A6 100%);
+    border-radius: 9px;
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700; font-size: 15px;
+  }
+  .brand h1 { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 700; margin: 0; }
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .role-badge {
+    font-size: 12px; font-weight: 600;
+    color: var(--primary-dark);
+    background: #E6F4F1;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid #B2DFDB;
+  }
+  .btn-signout {
+    background: none; border: 1.5px solid var(--border);
+    color: var(--muted); padding: 7px 16px;
+    border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s ease;
+    font-family: inherit;
+  }
+  .btn-signout:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* Main Container Layout */
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 24px;
+    max-width: 1440px;
+    margin: 24px auto;
+    padding: 0 24px;
+  }
+
+  /* Left Panel: Patient Management */
+  .panel-card {
+    background: var(--surface);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 24px;
+  }
+  .panel-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 17px; font-weight: 700;
+    margin: 0 0 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .search-box {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px; font-family: inherit;
+    margin-bottom: 16px;
+    background: #F8FAFC;
+  }
+  .search-box:focus { outline: none; border-color: var(--primary); background: #FFF; }
+
+  .patient-list {
+    display: flex; flex-direction: column; gap: 8px;
+    max-height: 380px; overflow-y: auto;
+  }
+  .patient-item {
+    padding: 12px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .patient-item:hover { border-color: var(--primary); background: #F0FDF4; }
+  .patient-item.active { border-color: var(--primary); background: #E6F4F1; font-weight: 600; }
+  .p-info { display: flex; align-items: center; gap: 10px; }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #0F6E5F; color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+  }
+  .p-name { font-size: 14px; color: var(--ink); }
+  .p-sub { font-size: 12px; color: var(--muted); }
+
+  /* Create Patient Form */
+  .create-box {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--border);
+  }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .form-row input {
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; font-family: inherit;
+  }
+  .btn-primary {
+    width: 100%; padding: 10px;
+    background: var(--primary); color: white;
+    border: none; border-radius: 8px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .btn-primary:hover { background: var(--primary-dark); }
+
+  /* Right Panel: Healthcare Monitoring Suite */
+  .suite-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+  }
+  .patient-header-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 22px; font-weight: 700; margin: 0 0 4px;
+  }
+  .patient-details-row {
+    font-size: 13px; color: var(--muted); font-weight: 500;
+  }
+  .patient-details-row span {
+    font-weight: 600; color: var(--ink); margin-right: 14px;
+  }
+
+  .risk-container { display: flex; align-items: center; gap: 12px; }
+  .risk-score-pill {
+    font-size: 13px; font-weight: 700; background: #F1F5F9;
+    padding: 6px 12px; border-radius: 20px; border: 1.5px solid var(--border);
+  }
+  .risk-badge {
+    padding: 6px 16px; border-radius: 20px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700; font-size: 14px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .risk-NORMAL { background: var(--success-bg); color: var(--success); border: 1.5px solid var(--success); }
+  .risk-WARNING { background: var(--warning-bg); color: var(--warning); border: 1.5px solid var(--warning); }
+  .risk-HIGH { background: var(--danger-bg); color: var(--danger); border: 1.5px solid var(--danger); animation: pulse 1.5s infinite; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  }
+
+  /* Live Vital Metric Cards */
+  .vitals-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+    margin-bottom: 24px;
+  }
+  .vital-card {
+    background: var(--surface); border-radius: 12px;
+    border: 1.5px solid var(--border); padding: 18px;
+    box-shadow: var(--shadow); position: relative;
+  }
+  .vital-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.5px; }
+  .vital-value { font-family: 'Outfit', sans-serif; font-size: 30px; font-weight: 700; color: var(--ink); }
+  .vital-unit { font-size: 14px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+  .simulation-label {
+    display: inline-block; margin-bottom: 8px; padding: 2px 7px;
+    border: 1px solid #FDE68A; border-radius: 10px;
+    background: #FFFBEB; color: #92400E;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.4px;
+  }
+  /* Clinical Decision Rationale */
+  .rationale-box {
+    background: #F8FAFC; border: 1.5px solid var(--border);
+    border-radius: 12px; padding: 18px; margin-bottom: 24px;
+  }
+  .rationale-title { font-size: 14px; font-weight: 700; color: var(--ink); margin: 0 0 10px; }
+  .abnormal-tag {
+    display: inline-block; font-size: 11px; font-weight: 700; color: var(--danger);
+    background: var(--danger-bg); border: 1px solid var(--danger);
+    padding: 2px 8px; border-radius: 12px; margin-right: 6px; margin-bottom: 6px;
+  }
+  .rationale-list { margin: 8px 0 0; padding-left: 20px; font-size: 13px; color: #334155; line-height: 1.6; }
+
+  /* Documents Embedded Section */
+  .doc-section { margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 16px; }
+  .doc-list { list-style: none; padding: 0; margin: 12px 0 0; }
+  .doc-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 8px; background: #F8FAFC; font-size: 13px;
+  }
+
+  /* Alert Log Table */
+  .alert-table {
+    width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px;
+  }
+  .alert-table th { text-align: left; padding: 10px; background: #F8FAFC; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .alert-table td { padding: 10px; border-bottom: 1px solid var(--border); }
+
+  #errorMsg { color: var(--danger); font-size: 13px; margin: 10px 0; font-weight: 600; }
+  #statusMsg { color: var(--primary); font-size: 13px; margin: 10px 0; font-weight: 600; }
+</style>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <div class="navbar">
+    <div class="brand">
+      <div class="logo">MC</div>
+      <h1>MediChart Monitoring System</h1>
+    </div>
+    <div class="nav-right">
+      <span class="role-badge" id="roleBadge">Doctor Role</span>
+      <button class="btn-signout" onclick="logout()">Sign Out</button>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="dashboard-grid">
+
+    <!-- Left Column: Patient Directory -->
+    <div>
+      <div class="panel-card">
+        <div class="panel-title">
+          <span>Patient Directory</span>
+          <button class="btn-primary" style="width:auto;padding:4px 10px;" onclick="loadPatients(true)">Refresh</button>
+        </div>
+
+        <input type="text" id="searchBox" class="search-box" placeholder="Search patient by name..." onkeyup="filterPatients()">
+
+        <div class="patient-list" id="patientList"></div>
+
+        <!-- Register New Patient -->
+        <form class="create-box" id="createPatientForm">
+          <h4 style="margin:0 0 10px;font-size:13px;">+ Register New Patient</h4>
+          <div class="form-row">
+            <input type="text" id="newId" placeholder="ID (e.g. P004)" aria-label="Patient ID" required maxlength="100">
+            <input type="text" id="newName" placeholder="Full Name" aria-label="Full name" required maxlength="200">
+          </div>
+          <div class="form-row">
+            <input type="number" id="newAge" placeholder="Age" aria-label="Age" min="0" max="130" step="1">
+            <input type="text" id="newGender" placeholder="Gender" aria-label="Gender" maxlength="100">
+          </div>
+          <button class="btn-primary" id="registerPatientButton" type="submit">Register Patient</button>
+        </form>
+      </div>
+      <p id="errorMsg"></p>
+      <p id="statusMsg"></p>
+    </div>
+
+    <!-- Right Column: Patient Monitoring Suite -->
+    <div>
+      <div class="panel-card">
+        <!-- Patient Information Header -->
+        <div class="suite-header">
+          <div>
+            <h2 class="patient-header-title" id="selectedPatientName">Loading Patient...</h2>
+            <div class="patient-details-row">
+              Patient ID: <span id="pId">--</span>
+              Age: <span id="pAge">--</span>
+              Gender: <span id="pGender">--</span>
+            </div>
+          </div>
+          <div class="risk-container">
+            <div class="risk-score-pill">Risk Score: <span id="riskScore">0</span> / 10</div>
+            <span class="risk-badge risk-NORMAL" id="riskBadge">NORMAL</span>
+          </div>
+        </div>
+
+        <!-- Live Vitals Cards -->
+        <span class="simulation-label">SIMULATION</span>
+        <div class="vitals-grid">
+          <div class="vital-card">
+            <div class="vital-label">HEART RATE</div>
+            <div><span class="vital-value" id="hrVal">--</span><span class="vital-unit">BPM</span></div>
+          </div>
+          <div class="vital-card">
+            <div class="vital-label">OXYGEN SATURATION (SpO2)</div>
+            <div><span class="vital-value" id="spo2Val">--</span><span class="vital-unit">%</span></div>
+          </div>
+          <div class="vital-card">
+            <div class="vital-label">BODY TEMPERATURE</div>
+            <div><span class="vital-value" id="tempVal">--</span><span class="vital-unit">°C</span></div>
+          </div>
+        </div>
+
+        <!-- Clinical Risk Rationale -->
+        <div class="rationale-box">
+          <div class="rationale-title">Clinical Decision Support & Risk Analysis</div>
+          <div id="abnormalContainer"></div>
+          <ul class="rationale-list" id="rationaleList">
+            <li>Select a patient to inspect stored clinical risk rationale.</li>
+          </ul>
+        </div>
+
+        <!-- Medical Documents Vault Embedded Component -->
+        <div class="doc-section">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <h4 style="margin:0;font-size:14px;font-weight:700;">📄 Medical Documents Vault (S3 Presigned URLs)</h4>
+            <a id="docVaultLink" href="#" style="font-size:12px;color:var(--primary);font-weight:600;text-decoration:none;">Open Full Vault Page →</a>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:10px;">
+            <input type="file" id="embedFileInput" style="font-size:12px;">
+            <button class="btn-primary" style="width:auto;padding:6px 14px;" onclick="uploadEmbeddedDocument()">Upload to S3</button>
+          </div>
+
+          <ul class="doc-list" id="embedDocList"></ul>
+          <p id="embedDocEmpty" style="font-size:12px;color:var(--muted);margin:8px 0;display:none;">No medical attachments uploaded yet for this patient.</p>
+        </div>
+      </div>
+
+      <!-- Real-time Vital & Risk Trend Chart -->
+      <div class="panel-card">
+        <h3 style="font-size:15px;font-weight:700;margin:0 0 16px;color:var(--ink);">Real-Time Vital Sign & Risk Score Time-Series Trends</h3>
+        <canvas id="vitalsChart" height="95"></canvas>
+      </div>
+
+      <!-- Emergency Alert Log -->
+      <div class="panel-card">
+        <h3 style="font-size:15px;font-weight:700;margin:0 0 12px;color:var(--ink);">Recent High-Risk Emergency Alerts</h3>
+        <table class="alert-table">
+          <thead>
+            <tr><th>Timestamp</th><th>Risk Level</th><th>Heart Rate</th><th>SpO2</th><th>Temp</th><th>SNS Message ID</th></tr>
+          </thead>
+          <tbody id="alertRows">
+            <tr><td colspan="6" style="color:var(--muted);text-align:center;">No high-risk alerts recorded.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const API_BASE = "https://sf4pw8iev0.execute-api.ap-south-1.amazonaws.com/dev";
+    const token = sessionStorage.getItem("idToken");
+    const COGNITO_CLIENT_ID = "5ok9ten25r2dgh9u5q2omuihml";
+    const COGNITO_REGION = "ap-south-1";
+
+    if (!token) window.location.href = "index.html";
+
+    let patientsCache = [];
+    let selectedPatientId = "P001";
+    let vitalsChart = null;
+    let refreshPromise = null;
+    let monitoringRequestId = 0;
+    let simulationTick = 0;
+
+    async function refreshIdToken() {
+      if (refreshPromise) return refreshPromise;
+      const refreshToken = sessionStorage.getItem("refreshToken");
+      if (!refreshToken) {
+        sessionStorage.removeItem("idToken");
+        window.location.href = "index.html";
+        throw new Error("Your session expired. Please sign in again.");
+      }
+
+      refreshPromise = (async () => {
+        const res = await fetch(`https://cognito-idp.${COGNITO_REGION}.amazonaws.com/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-amz-json-1.1",
+            "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth"
+          },
+          body: JSON.stringify({
+            AuthFlow: "REFRESH_TOKEN_AUTH",
+            ClientId: COGNITO_CLIENT_ID,
+            AuthParameters: { REFRESH_TOKEN: refreshToken }
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.AuthenticationResult?.IdToken) {
+          throw new Error(data.message || data.Message || "Session refresh failed. Please sign in again.");
+        }
+        sessionStorage.setItem("idToken", data.AuthenticationResult.IdToken);
+        return data.AuthenticationResult.IdToken;
+      })();
+
+      try {
+        return await refreshPromise;
+      } catch (err) {
+        sessionStorage.removeItem("idToken");
+        sessionStorage.removeItem("refreshToken");
+        window.location.href = "index.html";
+        throw err;
+      } finally {
+        refreshPromise = null;
+      }
+    }
+
+    async function apiFetch(url, options = {}) {
+      let currentToken = sessionStorage.getItem("idToken");
+      if (!currentToken) {
+        window.location.href = "index.html";
+        throw new Error("Sign in is required.");
+      }
+
+      const send = jwt => fetch(url, {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          "Authorization": `Bearer ${jwt}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      let response = await send(currentToken);
+      if (response.status === 401) {
+        currentToken = await refreshIdToken();
+        response = await send(currentToken);
+      }
+      return response;
+    }
+
+    async function responseError(res) {
+      let details = "";
+      try {
+        const data = await res.clone().json();
+        details = data.error || data.message || "";
+      } catch {}
+      if (res.status === 401) return "Session expired or invalid. Please sign in again.";
+      if (res.status === 403) return details || "You do not have permission to perform this action.";
+      return details || `Request failed (HTTP ${res.status})`;
+    }
+
+    function getUserGroups() {
+      try {
+        const payloadPart = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+        const payload = JSON.parse(atob(payloadPart));
+        return payload["cognito:groups"] || [];
+      } catch { return []; }
+    }
+
+    const userGroups = getUserGroups();
+    const isAdmin = userGroups.includes("admin");
+    const canDeletePatients = isAdmin || userGroups.includes("doctor");
+    document.getElementById("roleBadge").textContent = isAdmin ? "Admin Role" : "Doctor Role";
+
+    // Initialize Chart.js with 4 datasets: Heart Rate, SpO2, Temp, Risk Score
+    function initChart() {
+      if (typeof Chart === "undefined") {
+        document.getElementById("statusMsg").textContent =
+          "Trend chart unavailable because Chart.js did not load. Patient registration and vital simulation are still available.";
+        return;
+      }
+
+      const ctx = document.getElementById("vitalsChart").getContext("2d");
+      vitalsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            { label: 'Heart Rate (BPM)', data: [], borderColor: '#0F6E5F', backgroundColor: 'rgba(15, 110, 95, 0.08)', tension: 0.3, yAxisID: 'y' },
+            { label: 'SpO2 (%)', data: [], borderColor: '#3B82F6', backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y1' },
+            { label: 'Temperature (°C)', data: [], borderColor: '#F59E0B', backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y2' },
+            { label: 'Risk Score (0-10)', data: [], borderColor: '#EF4444', borderDash: [4,4], backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y3' }
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'BPM' } },
+            y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'SpO2 %' } },
+            y2: { type: 'linear', display: false },
+            y3: { type: 'linear', display: false }
+          }
+        }
+      });
+    }
+
+    async function loadPatients(autoSelectFirst = false) {
+      const errorMsg = document.getElementById("errorMsg");
+      errorMsg.textContent = "Loading patients...";
+
+      try {
+        const res = await apiFetch(`${API_BASE}/patients`);
+        if (!res.ok) throw new Error(await responseError(res));
+        const data = await res.json();
+        patientsCache = Array.isArray(data) ? data : data?.patients;
+        if (!Array.isArray(patientsCache)) {
+          throw new Error("Patient API returned an unexpected response format.");
+        }
+        renderPatientList(patientsCache);
+        errorMsg.textContent = patientsCache.length ? "" : "No patients were returned by the API.";
+
+        if (patientsCache.length > 0) {
+          const currentPatientExists = patientsCache.some(patient => patient.PatientId === selectedPatientId);
+          const initialPatient = patientsCache.find(patient => patient.PatientId === "P001") || patientsCache[0];
+          if (autoSelectFirst || !currentPatientExists) {
+            selectPatient(initialPatient.PatientId);
+          } else {
+            selectPatient(selectedPatientId);
+          }
+        }
+        return true;
+      } catch (err) {
+        errorMsg.textContent = "Could not load patients: " + err.message;
+        return false;
+      }
+    }
+
+    function renderPatientList(list) {
+      const el = document.getElementById("patientList");
+      el.innerHTML = "";
+      list.forEach(p => {
+        const item = document.createElement("div");
+        item.className = `patient-item ${p.PatientId === selectedPatientId ? 'active' : ''}`;
+        item.onclick = () => selectPatient(p.PatientId);
+        const info = document.createElement("div");
+        info.className = "p-info";
+        const avatar = document.createElement("div");
+        avatar.className = "avatar";
+        avatar.textContent = p.Name ? p.Name.substring(0, 2).toUpperCase() : "P";
+        const details = document.createElement("div");
+        const name = document.createElement("div");
+        name.className = "p-name";
+        name.textContent = p.Name || "Unnamed patient";
+        const sub = document.createElement("div");
+        sub.className = "p-sub";
+        sub.textContent = `ID: ${p.PatientId} | Age: ${p.Age ?? "--"}`;
+        details.append(name, sub);
+        info.append(avatar, details);
+        item.appendChild(info);
+        if (canDeletePatients) {
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.textContent = "Delete";
+          remove.setAttribute("aria-label", `Delete patient ${p.Name || p.PatientId}`);
+          remove.style.cssText = "background:none;border:0;color:var(--danger);font-size:12px;font-weight:600;cursor:pointer;";
+          remove.onclick = event => {
+            event.stopPropagation();
+            deletePatient(p.PatientId);
+          };
+          item.appendChild(remove);
+        }
+        el.appendChild(item);
+      });
+    }
+
+    function filterPatients() {
+      const q = document.getElementById("searchBox").value.toLowerCase();
+      const filtered = patientsCache.filter(p => (p.Name || "").toLowerCase().includes(q) || (p.PatientId || "").toLowerCase().includes(q));
+      renderPatientList(filtered);
+    }
+
+    function selectPatient(patientId) {
+      selectedPatientId = patientId;
+      renderPatientList(patientsCache);
+      const p = patientsCache.find(x => x.PatientId === patientId) || { PatientId: patientId, Name: patientId, Age: '--', Gender: '--' };
+
+      document.getElementById("selectedPatientName").textContent = p.Name || patientId;
+      document.getElementById("pId").textContent = p.PatientId;
+      document.getElementById("pAge").textContent = p.Age !== undefined ? p.Age : '--';
+      document.getElementById("pGender").textContent = p.Gender || '--';
+      document.getElementById("docVaultLink").href = `documents.html?PatientId=${p.PatientId}`;
+
+      updateSimulatedVitals();
+      document.getElementById("statusMsg").textContent = "";
+
+      fetchPatientMonitoring(patientId);
+      fetchPatientAlerts(patientId);
+      fetchEmbeddedDocuments(patientId);
+    }
+
+    async function fetchPatientMonitoring(patientId) {
+      const requestId = ++monitoringRequestId;
+      try {
+        const res = await apiFetch(`${API_BASE}/patients/${encodeURIComponent(patientId)}/vitals`);
+        if (!res.ok) throw new Error(await responseError(res));
+        const data = await res.json();
+        if (requestId !== monitoringRequestId || patientId !== selectedPatientId) return;
+        const r = data.LatestRisk;
+        const history = data.History || [];
+
+        if (r) {
+          document.getElementById("riskScore").textContent = r.RiskScore !== undefined ? r.RiskScore : 0;
+          const badge = document.getElementById("riskBadge");
+          badge.textContent = r.RiskLevel || "NORMAL";
+          badge.className = `risk-badge risk-${r.RiskLevel || 'NORMAL'}`;
+
+          const abnormalContainer = document.getElementById("abnormalContainer");
+          abnormalContainer.innerHTML = "";
+          (r.DetectedAbnormalities || []).forEach(a => {
+            const span = document.createElement("span");
+            span.className = "abnormal-tag";
+            span.textContent = a;
+            abnormalContainer.appendChild(span);
+          });
+
+          const list = document.getElementById("rationaleList");
+          list.innerHTML = "";
+          const explanations = Array.isArray(r.Explanation)
+            ? r.Explanation
+            : typeof r.Explanation === "string" ? [r.Explanation] : [];
+          explanations.forEach(e => {
+            const li = document.createElement("li");
+            li.textContent = e;
+            list.appendChild(li);
+          });
+        } else {
+          document.getElementById("riskScore").textContent = "0";
+          document.getElementById("riskBadge").textContent = "NORMAL";
+          document.getElementById("riskBadge").className = "risk-badge risk-NORMAL";
+          document.getElementById("abnormalContainer").innerHTML = "";
+          document.getElementById("rationaleList").innerHTML = "<li>No risk assessment is available for this patient.</li>";
+        }
+
+        const labels = history.map(item =>
+          new Date(item.Timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+        );
+        if (vitalsChart) {
+          vitalsChart.data.labels = labels;
+          vitalsChart.data.datasets[0].data = history.map(item => item.HeartRate ?? null);
+          vitalsChart.data.datasets[1].data = history.map(item => item.SpO2 ?? null);
+          vitalsChart.data.datasets[2].data = history.map(item => item.Temperature ?? null);
+          vitalsChart.data.datasets[3].data = history.map(() => null);
+          vitalsChart.update();
+        }
+      } catch (err) {
+        if (requestId !== monitoringRequestId || patientId !== selectedPatientId) return;
+        document.getElementById("statusMsg").textContent = `Could not load patient readings: ${err.message}`;
+      }
+    }
+
+    function updateSimulatedVitals() {
+      simulationTick += 1;
+      document.getElementById("hrVal").textContent = 72 + (simulationTick % 7) - 3;
+      document.getElementById("spo2Val").textContent = 98 + (simulationTick % 3) - 1;
+      document.getElementById("tempVal").textContent =
+        (36.8 + ((simulationTick % 5) - 2) / 10).toFixed(1);
+    }
+
+    async function fetchPatientAlerts(patientId) {
+      try {
+        const res = await apiFetch(`${API_BASE}/patients/${encodeURIComponent(patientId)}/alerts`);
+        if (!res.ok) throw new Error(await responseError(res));
+        const data = await res.json();
+        const alerts = data.Alerts || [];
+
+        const tbody = document.getElementById("alertRows");
+        tbody.innerHTML = "";
+        if (alerts.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted);text-align:center;">No high-risk alerts recorded for this patient.</td></tr>`;
+          return;
+        }
+
+        alerts.forEach(a => {
+          const snap = a.VitalsSnapshot || {};
+          const tr = document.createElement("tr");
+          const values = [
+            new Date(a.Timestamp).toLocaleString(),
+            a.RiskLevel || "HIGH",
+            snap.HeartRate == null ? "N/A" : `${snap.HeartRate} BPM`,
+            snap.SpO2 == null ? "N/A" : `${snap.SpO2}%`,
+            snap.Temperature == null ? "N/A" : `${snap.Temperature}°C`,
+            a.SNSMessageId || "SENT"
+          ];
+          values.forEach(value => {
+            const td = document.createElement("td");
+            td.textContent = value;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        const row = document.getElementById("alertRows").insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = 6;
+        cell.style.cssText = "color:var(--danger);text-align:center;";
+        cell.textContent = `Could not load alerts: ${err.message}`;
+      }
+    }
+
+    async function fetchEmbeddedDocuments(patientId) {
+      const listEl = document.getElementById("embedDocList");
+      const emptyEl = document.getElementById("embedDocEmpty");
+      listEl.innerHTML = "";
+      emptyEl.style.display = "none";
+
+      try {
+        const res = await apiFetch(`${API_BASE}/documents?action=list&PatientId=${encodeURIComponent(patientId)}`);
+        if (!res.ok) throw new Error(await responseError(res));
+        const data = await res.json();
+        const docs = data.documents || [];
+
+        if (docs.length === 0) {
+          emptyEl.style.display = "block";
+          return;
+        }
+        emptyEl.style.display = "none";
+
+        docs.forEach(d => {
+          const li = document.createElement("li");
+          li.className = "doc-item";
+          const filename = document.createElement("strong");
+          filename.textContent = d.Filename || "Document";
+          const actions = document.createElement("div");
+          const download = document.createElement("button");
+          download.type = "button";
+          download.textContent = "Download";
+          download.style.cssText = "background:none;border:0;color:var(--primary);margin-right:10px;font-weight:600;cursor:pointer;";
+          download.onclick = () => downloadEmbedDoc(d.S3Key);
+          actions.appendChild(download);
+          if (isAdmin) {
+            const remove = document.createElement("button");
+            remove.type = "button";
+            remove.textContent = "Delete";
+            remove.style.cssText = "background:none;border:0;color:var(--danger);font-weight:600;cursor:pointer;";
+            remove.onclick = () => deleteEmbedDoc(d.DocumentId, d.S3Key);
+            actions.appendChild(remove);
+          }
+          li.append(filename, actions);
+          listEl.appendChild(li);
+        });
+      } catch (err) {
+        emptyEl.textContent = `Could not load documents: ${err.message}`;
+        emptyEl.style.display = "block";
+      }
+    }
+
+    async function uploadEmbeddedDocument() {
+      const fileInput = document.getElementById("embedFileInput");
+      const file = fileInput.files[0];
+      if (!file) return alert("Select a document file first");
+
+      try {
+        const contentType = file.type || "application/octet-stream";
+        const urlRes = await apiFetch(`${API_BASE}/documents?action=upload-url&PatientId=${encodeURIComponent(selectedPatientId)}&filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(contentType)}`);
+        const urlData = await urlRes.json();
+        if (!urlRes.ok) return alert(urlData.error || "Failed to get upload URL");
+
+        const formData = new FormData();
+        Object.entries(urlData.fields).forEach(([name, value]) => formData.append(name, value));
+        formData.append("file", file);
+        const uploadRes = await fetch(urlData.upload_url, { method: "POST", body: formData });
+        if (!uploadRes.ok) {
+          const errorBody = await uploadRes.text();
+          const errorCode = errorBody.match(/<Code>([^<]*)<\/Code>/i)?.[1];
+          const errorMessage = errorBody.match(/<Message>([^<]*)<\/Message>/i)?.[1];
+          return alert(`S3 upload failed (HTTP ${uploadRes.status}${errorCode ? `, ${errorCode}` : ""})${errorMessage ? `: ${errorMessage}` : ""}`);
+        }
+
+        fileInput.value = "";
+        fetchEmbeddedDocuments(selectedPatientId);
+        alert(`Uploaded ${file.name} to private S3 bucket successfully!`);
+      } catch (err) {
+        alert("Upload error: " + err.message);
+      }
+    }
+
+    async function downloadEmbedDoc(s3Key) {
+      try {
+        const res = await apiFetch(`${API_BASE}/documents?action=download-url&key=${encodeURIComponent(s3Key)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || await responseError(res));
+        if (data.download_url) window.open(data.download_url, "_blank", "noopener");
+      } catch (err) { alert("Download error: " + err.message); }
+    }
+
+    async function deleteEmbedDoc(documentId, s3Key) {
+      if (!confirm("Delete this document?")) return;
+      try {
+        const res = await apiFetch(`${API_BASE}/documents?DocumentId=${encodeURIComponent(documentId)}&key=${encodeURIComponent(s3Key)}`, { method: "DELETE" });
+        if (res.ok) fetchEmbeddedDocuments(selectedPatientId);
+        else alert(await responseError(res));
+      } catch (err) { alert("Delete error: " + err.message); }
+    }
+
+    async function createPatient() {
+      const pid = document.getElementById("newId").value.trim();
+      const name = document.getElementById("newName").value.trim();
+      const age = document.getElementById("newAge").value.trim();
+      const gender = document.getElementById("newGender").value.trim();
+
+      const errorMsg = document.getElementById("errorMsg");
+      const statusMsg = document.getElementById("statusMsg");
+      const button = document.getElementById("registerPatientButton");
+      errorMsg.textContent = "";
+      statusMsg.textContent = "Preparing patient registration...";
+
+      if (!pid || !name) {
+        errorMsg.textContent = "Patient ID and name are required.";
+        statusMsg.textContent = "";
+        return;
+      }
+
+      if (age && (!Number.isInteger(Number(age)) || Number(age) < 0 || Number(age) > 130)) {
+        errorMsg.textContent = "Age must be a whole number between 0 and 130.";
+        statusMsg.textContent = "";
+        return;
+      }
+
+      const body = { PatientId: pid, Name: name, Gender: gender };
+      if (age) body.Age = Number(age);
+
+      button.disabled = true;
+      button.textContent = "Registering...";
+      statusMsg.textContent = `Registering ${name}...`;
+      try {
+        const res = await apiFetch(`${API_BASE}/patients`, {
+          method: "POST", body: JSON.stringify(body)
+        });
+
+        if (!res.ok) throw new Error(await responseError(res));
+        document.getElementById("newId").value = "";
+        document.getElementById("newName").value = "";
+        document.getElementById("newAge").value = "";
+        document.getElementById("newGender").value = "";
+        selectedPatientId = pid;
+        const refreshed = await loadPatients(false);
+        const patientVisible = patientsCache.some(patient => patient.PatientId === pid);
+        statusMsg.textContent = refreshed && patientVisible
+          ? `Patient ${name} registered successfully.`
+          : `Patient ${name} was registered, but the directory could not refresh. Use Refresh to reload it.`;
+      } catch (err) {
+        errorMsg.textContent = "Could not register patient: " + err.message;
+        statusMsg.textContent = "";
+      } finally {
+        button.disabled = false;
+        button.textContent = "Register Patient";
+      }
+    }
+
+    async function deletePatient(pid) {
+      if (!confirm(`Delete patient record ${pid}? This cannot be undone.`)) return;
+      try {
+        const res = await apiFetch(`${API_BASE}/patients/${encodeURIComponent(pid)}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(await responseError(res));
+        const refreshed = await loadPatients(true);
+        if (refreshed) {
+          document.getElementById("statusMsg").textContent = `Patient ${pid} deleted successfully.`;
+        }
+      } catch (err) {
+        document.getElementById("errorMsg").textContent = "Could not delete patient: " + err.message;
+      }
+    }
+
+    function logout() {
+      sessionStorage.removeItem("idToken");
+      sessionStorage.removeItem("refreshToken");
+      window.location.href = "index.html";
+    }
+
+    initChart();
+    document.getElementById("createPatientForm").addEventListener("submit", event => {
+      event.preventDefault();
+      createPatient();
+    });
+    updateSimulatedVitals();
+    loadPatients(true);
+    setInterval(() => {
+      updateSimulatedVitals();
+    }, 3000);
+    setInterval(() => {
+      if (selectedPatientId && document.visibilityState === "visible") {
+        fetchPatientMonitoring(selectedPatientId);
+      }
+    }, 3000);
+  </script>
+</body>
+</html>

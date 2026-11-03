@@ -1,0 +1,44 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:Scan"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:ap-south-1:798645002694:table/Patients",
+        "arn:aws:dynamodb:ap-south-1:798645002694:table/Patients/*",
+        "arn:aws:dynamodb:ap-south-1:798645002694:table/Documents",
+        "arn:aws:dynamodb:ap-south-1:798645002694:table/Documents/*",
+        "arn:aws:dynamodb:ap-south-1:798645002694:table/VitalReadings",
+        "arn:aws:dynamodb:ap-south-1:798645002694:table/VitalReadings/*",
+        "arn:aws:dynamodb:ap-south-1:798645002694:table/RiskAssessments",
+        "arn:aws:dynamodb:ap-south-1:798645002694:table/RiskAssessments/*",
+        "arn:aws:dynamodb:ap-south-1:798645002694:table/Alerts",
+        "arn:aws:dynamodb:ap-south-1:798645002694:table/Alerts/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::sanmugam-ehr-docs-2026/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sns:Publish"
+      ],
+      "Resource": "arn:aws:sns:ap-south-1:798645002694:EHR-HighRiskAlerts"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+.aws-sam/
+.pio/
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+infrastructure/certs/
+infrastructure/credentials.h
+infrastructure/*.pem
+infrastructure/*.key
+infrastructure/*.crt
+samconfig.toml

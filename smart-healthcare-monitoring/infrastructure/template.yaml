@@ -1,0 +1,509 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Smart Healthcare Monitoring demonstration - serverless AWS backend
+
+Parameters:
+  FrontendOrigin:
+    Type: String
+    Default: http://localhost:8000
+    Description: Exact browser origin hosting the frontend; update before deployment if different.
+  CognitoDomainPrefix:
+    Type: String
+    Description: Globally unique Cognito hosted UI domain prefix.
+  FrontendRedirectUri:
+    Type: String
+    Default: http://localhost:8000/
+    Description: Exact OAuth callback and sign-out URI, including trailing slash.
+  ThresholdHeartRateElevated:
+    Type: Number
+    Default: 100
+  ThresholdHeartRateHigh:
+    Type: Number
+    Default: 116
+  ThresholdSpO2Low:
+    Type: Number
+    Default: 96
+  ThresholdSpO2High:
+    Type: Number
+    Default: 92
+  ThresholdTemperatureElevated:
+    Type: Number
+    Default: 37.5
+  ThresholdTemperatureHigh:
+    Type: Number
+    Default: 38.3
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 15
+    MemorySize: 128
+    CodeUri: ../lambda/
+    Environment:
+      Variables:
+        PATIENTS_TABLE: !Ref PatientsTable
+        VITALS_TABLE: !Ref VitalReadingsTable
+        RISK_TABLE: !Ref RiskAssessmentsTable
+        ALERTS_TABLE: !Ref AlertsTable
+        DOCUMENTS_TABLE: !Ref DocumentsTable
+        DOCUMENTS_BUCKET: !Ref DocumentsBucket
+        ALERTS_TOPIC_ARN: !Ref AlertsTopic
+
+Resources:
+  PatientsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-Patients'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PatientId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PatientId
+          KeyType: HASH
+
+  VitalReadingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-VitalReadings'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PatientId
+          AttributeType: S
+        - AttributeName: Timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PatientId
+          KeyType: HASH
+        - AttributeName: Timestamp
+          KeyType: RANGE
+
+  RiskAssessmentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-RiskAssessments'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PatientId
+          AttributeType: S
+        - AttributeName: Timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PatientId
+          KeyType: HASH
+        - AttributeName: Timestamp
+          KeyType: RANGE
+
+  AlertsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-Alerts'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: AlertId
+          AttributeType: S
+        - AttributeName: PatientId
+          AttributeType: S
+        - AttributeName: Timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: AlertId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: PatientAlertsIndex
+          KeySchema:
+            - AttributeName: PatientId
+              KeyType: HASH
+            - AttributeName: Timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  DocumentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-Documents'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PatientId
+          AttributeType: S
+        - AttributeName: DocumentId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PatientId
+          KeyType: HASH
+        - AttributeName: DocumentId
+          KeyType: RANGE
+
+  DocumentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['content-type']
+            AllowedMethods: [GET, POST]
+            AllowedOrigins: [!Ref FrontendOrigin]
+            ExposedHeaders: [ETag]
+            MaxAge: 300
+      LifecycleConfiguration:
+        Rules:
+          - Id: AbortIncompleteUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-health-alerts'
+
+  DoctorUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${AWS::StackName}-doctors'
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      MfaConfiguration: OPTIONAL
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+
+  DoctorAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub '${AWS::StackName}-web'
+      UserPoolId: !Ref DoctorUserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      CallbackURLs: [!Ref FrontendRedirectUri]
+      LogoutURLs: [!Ref FrontendRedirectUri]
+      SupportedIdentityProviders: [COGNITO]
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 1
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+
+  DoctorUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref CognitoDomainPrefix
+      UserPoolId: !Ref DoctorUserPool
+
+  DoctorGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: doctor
+      UserPoolId: !Ref DoctorUserPool
+      Description: Read and manage patient monitoring data.
+
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: admin
+      UserPoolId: !Ref DoctorUserPool
+      Description: Administrative patient and alert operations.
+
+  DoctorApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: v1
+      CorsConfiguration:
+        AllowOrigins: [!Ref FrontendOrigin]
+        AllowHeaders: [authorization, content-type]
+        AllowMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        MaxAge: 600
+      Auth:
+        DefaultAuthorizer: CognitoJwt
+        Authorizers:
+          CognitoJwt:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${DoctorUserPool}'
+              audience:
+                - !Ref DoctorAppClient
+
+  PatientCrudFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: patient_crud.handler.lambda_handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: !GetAtt PatientsTable.Arn
+      Events:
+        ListPatients:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /patients
+            Method: GET
+        CreatePatient:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /patients
+            Method: POST
+        ReadPatient:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /patients/{patientId}
+            Method: GET
+        UpdatePatient:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /patients/{patientId}
+            Method: PUT
+        DeletePatient:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /patients/{patientId}
+            Method: DELETE
+
+  GetVitalsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: get_vitals.handler.lambda_handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:Query
+              Resource: !GetAtt VitalReadingsTable.Arn
+      Events:
+        GetVitals:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /patients/{patientId}/vitals
+            Method: GET
+        LatestVitals:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /patients/{patientId}/vitals/latest
+            Method: GET
+        VitalsHistory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /patients/{patientId}/vitals/history
+            Method: GET
+
+  RiskAssessmentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: risk_assessment.handler.lambda_handler
+      Environment:
+        Variables:
+          THRESHOLD_HR_ELEVATED: !Ref ThresholdHeartRateElevated
+          THRESHOLD_HR_HIGH: !Ref ThresholdHeartRateHigh
+          THRESHOLD_SPO2_LOW: !Ref ThresholdSpO2Low
+          THRESHOLD_SPO2_HIGH: !Ref ThresholdSpO2High
+          THRESHOLD_TEMP_ELEVATED: !Ref ThresholdTemperatureElevated
+          THRESHOLD_TEMP_HIGH: !Ref ThresholdTemperatureHigh
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:Query
+              Resource: !GetAtt VitalReadingsTable.Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:Query
+              Resource: !GetAtt RiskAssessmentsTable.Arn
+      Events:
+        PatientRisk:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /patients/{patientId}/risk
+            Method: GET
+        PatientRiskHistory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /patients/{patientId}/risk/history
+            Method: GET
+
+  ProcessVitalsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: process_vitals.handler.lambda_handler
+      Timeout: 30
+      Environment:
+        Variables:
+          RISK_FUNCTION_NAME: !Ref RiskAssessmentFunction
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref VitalReadingsTable
+        - DynamoDBWritePolicy:
+            TableName: !Ref AlertsTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertsTopic.TopicName
+        - Statement:
+            - Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource: !GetAtt RiskAssessmentFunction.Arn
+
+  DocumentManagementFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: document_management.handler.lambda_handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Query
+              Resource: !GetAtt DocumentsTable.Arn
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource: !Sub '${DocumentsBucket.Arn}/*'
+      Events:
+        CreateUploadUrl:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /documents/upload-url
+            Method: POST
+        ListDocuments:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /documents
+            Method: GET
+        DownloadDocument:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /documents/{documentId}/download-url
+            Method: GET
+        CompleteUpload:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /documents/{documentId}/complete
+            Method: POST
+
+  AlertManagementFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: alert_management.handler.lambda_handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt AlertsTable.Arn
+                - !Sub '${AlertsTable.Arn}/index/PatientAlertsIndex'
+      Events:
+        PatientAlerts:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /patients/{patientId}/alerts
+            Method: GET
+        UpdateAlert:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DoctorApi
+            Path: /alerts/{alertId}
+            Method: PATCH
+
+  Esp32Thing:
+    Type: AWS::IoT::Thing
+    Properties:
+      ThingName: ESP32_SIMULATOR
+      AttributePayload:
+        Attributes:
+          PatientId: P001
+          Source: ESP32_SIMULATED
+
+  Esp32Policy:
+    Type: AWS::IoT::Policy
+    Properties:
+      PolicyName: !Sub '${AWS::StackName}-esp32-publish'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: iot:Connect
+            Resource: !Sub 'arn:${AWS::Partition}:iot:${AWS::Region}:${AWS::AccountId}:client/ESP32_SIMULATOR'
+          - Effect: Allow
+            Action: iot:Publish
+            Resource: !Sub 'arn:${AWS::Partition}:iot:${AWS::Region}:${AWS::AccountId}:topic/smart-healthcare/P001/vitals'
+
+  VitalsTopicRule:
+    Type: AWS::IoT::TopicRule
+    DependsOn: AllowIoTInvokeProcessVitals
+    Properties:
+      RuleName: SmartHealthcareProcessVitals
+      TopicRulePayload:
+        RuleDisabled: false
+        Sql: "SELECT * FROM 'smart-healthcare/+/vitals'"
+        AwsIotSqlVersion: '2016-03-23'
+        Actions:
+          - Lambda:
+              FunctionArn: !GetAtt ProcessVitalsFunction.Arn
+
+  AllowIoTInvokeProcessVitals:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ProcessVitalsFunction
+      Principal: iot.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:iot:${AWS::Region}:${AWS::AccountId}:rule/SmartHealthcareProcessVitals'
+
+Outputs:
+  ApiBaseUrl:
+    Description: Authenticated API base URL
+    Value: !Sub 'https://${DoctorApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/v1'
+  UserPoolId:
+    Value: !Ref DoctorUserPool
+  AppClientId:
+    Value: !Ref DoctorAppClient
+  CognitoHostedUi:
+    Value: !Sub 'https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com'
+  DocumentsBucketName:
+    Value: !Ref DocumentsBucket
+  AlertsTopicArn:
+    Value: !Ref AlertsTopic

@@ -1,0 +1,12 @@
+{
+  "sql": "SELECT * FROM 'smart-healthcare/+/vitals'",
+  "ruleDisabled": false,
+  "awsIotSqlVersion": "2016-03-23",
+  "actions": [
+    {
+      "lambda": {
+        "functionArn": "arn:aws:lambda:ap-south-1:798645002694:function:EHR-IoTIngest"
+      }
+    }
+  ]
+}

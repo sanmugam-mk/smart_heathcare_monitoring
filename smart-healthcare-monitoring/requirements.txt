@@ -1,0 +1,4 @@
+# Runtime dependencies are provided by AWS Lambda Python 3.12.
+# boto3 is available in Lambda; installing it locally supports unit tests.
+boto3>=1.34,<2.0
+pytest>=8.0,<9.0

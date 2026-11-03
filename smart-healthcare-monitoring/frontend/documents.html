@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Medical Documents | MediChart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/documents.js"></script>
+</head>
+<body>
+  <header class="navbar">
+    <a class="brand" href="dashboard.html"><span class="brand-mark">M</span><span class="brand-name">MediChart Monitoring System</span></a>
+    <div class="nav-right"><a class="button button-quiet" href="dashboard.html">Dashboard</a><button id="sign-out" class="button button-outline">Sign Out</button></div>
+  </header>
+  <main class="documents-main">
+    <section class="panel-card">
+      <p class="eyebrow">PRIVATE S3 STORAGE</p><h1>Medical Documents Vault</h1>
+      <p class="muted">Documents are private in S3. Upload and download links expire after five minutes.</p>
+      <div id="document-error" class="notice notice-error" role="alert" hidden></div>
+      <form id="upload-form" class="upload-form">
+        <label>Patient ID<input id="document-patient-id" required value="P001"></label>
+        <label>Select a PDF or image<input id="document-file" type="file" accept=".pdf,image/jpeg,image/png" required></label>
+        <button class="button button-primary" type="submit">Upload to S3</button>
+      </form>
+      <p id="upload-feedback" class="inline-feedback" role="status"></p>
+      <div class="section-heading"><h2>Existing Documents</h2><button id="refresh-documents" class="text-button">Refresh</button></div>
+      <div id="document-list" class="document-list"><p class="muted">Enter a patient ID to load documents.</p></div>
+    </section>
+  </main>
+</body>
+</html>
